@@ -22,9 +22,36 @@ const COLORS = [
 ];
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ config, setConfig, isAnalyzing, onClear, onAnalyze }) => {
+  const handleUndo = () => window.dispatchEvent(new CustomEvent('undo-canvas'));
+  const handleRedo = () => window.dispatchEvent(new CustomEvent('redo-canvas'));
+
   return (
-    <div className="flex flex-col md:flex-row items-center gap-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-6 rounded-3xl shadow-2xl mb-4 w-full max-w-4xl animate-in slide-in-from-bottom-10 duration-500">
+    <div className="flex flex-col md:flex-row items-center gap-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 p-6 rounded-3xl shadow-2xl mb-4 w-full max-w-5xl animate-in slide-in-from-bottom-10 duration-500">
       
+      {/* History Controls */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleUndo}
+          title="Undo (Ctrl+Z)"
+          className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+        </button>
+        <button
+          onClick={handleRedo}
+          title="Redo (Ctrl+Y)"
+          className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 10h-10a8 8 0 00-8 8v2m18-12l-6 6m6-6l-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="h-10 w-px bg-zinc-800 hidden md:block" />
+
       {/* Color Picker */}
       <div className="flex flex-col gap-2">
         <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Palette</label>
@@ -74,7 +101,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({ config, setConfig, i
           onClick={onClear}
           className="px-5 py-2.5 rounded-xl text-sm font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
         >
-          Clear Canvas
+          Clear
         </button>
         <button
           onClick={onAnalyze}

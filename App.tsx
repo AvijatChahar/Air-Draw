@@ -60,11 +60,11 @@ const App: React.FC = () => {
       {/* Overlay UI */}
       <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
         <div className="flex justify-between items-start">
-          <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 p-4 rounded-2xl shadow-2xl">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+          <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/40 p-3 rounded-xl shadow-lg transition-opacity hover:opacity-100 opacity-80">
+            <h1 className="text-sm font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent opacity-60">
               AirDraw AI
             </h1>
-            <p className="text-zinc-400 text-sm">Real-time Hand Gesture Canvas</p>
+            <p className="text-zinc-500 text-[10px] font-medium tracking-tight opacity-40">Hand Gesture Canvas</p>
           </div>
           
           <GestureLegend currentGesture={currentGesture} />

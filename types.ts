@@ -6,6 +6,11 @@ export enum GestureType {
   ERASE = 'ERASE'
 }
 
+export enum PathType {
+  DRAW = 'DRAW',
+  ERASE = 'ERASE'
+}
+
 export interface DrawingConfig {
   color: string;
   brushSize: number;
@@ -20,4 +25,5 @@ export interface Path {
   points: Point[];
   color: string;
   size: number;
+  type: PathType;
 }

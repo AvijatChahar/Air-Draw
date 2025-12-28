@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useCallback } from 'react';
-import { GestureType, DrawingConfig, Point } from '../types';
+import { GestureType, DrawingConfig, Point, Path, PathType } from '../types';
 
 interface AirCanvasProps {
   config: DrawingConfig;
@@ -8,7 +8,7 @@ interface AirCanvasProps {
   onCapture: (dataUrl: string) => void;
 }
 
-// Global MediaPipe references because they are loaded via CDN
+// Global MediaPipe references
 declare const Hands: any;
 declare const Camera: any;
 
@@ -18,16 +18,64 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorCanvasRef = useRef<HTMLCanvasElement>(null);
   
-  // State for drawing logic
-  const isDrawing = useRef(false);
+  // History state
+  const paths = useRef<Path[]>([]);
+  const redoStack = useRef<Path[]>([]);
+  const currentPath = useRef<Path | null>(null);
   const lastPoint = useRef<Point | null>(null);
 
-  const clearCanvas = useCallback(() => {
-    const ctx = drawingCanvasRef.current?.getContext('2d');
-    if (ctx && drawingCanvasRef.current) {
-      ctx.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+  const drawPath = (ctx: CanvasRenderingContext2D, path: Path) => {
+    if (path.points.length < 2) return;
+    
+    ctx.beginPath();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = path.size;
+
+    if (path.type === PathType.ERASE) {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = path.color;
     }
+
+    ctx.moveTo(path.points[0].x, path.points[0].y);
+    for (let i = 1; i < path.points.length; i++) {
+      ctx.lineTo(path.points[i].x, path.points[i].y);
+    }
+    ctx.stroke();
+    
+    // Reset to default
+    ctx.globalCompositeOperation = 'source-over';
+  };
+
+  const redrawAll = useCallback(() => {
+    const ctx = drawingCanvasRef.current?.getContext('2d');
+    if (!ctx || !drawingCanvasRef.current) return;
+    
+    ctx.clearRect(0, 0, drawingCanvasRef.current.width, drawingCanvasRef.current.height);
+    paths.current.forEach(path => drawPath(ctx, path));
   }, []);
+
+  const undo = useCallback(() => {
+    if (paths.current.length === 0) return;
+    const last = paths.current.pop();
+    if (last) redoStack.current.push(last);
+    redrawAll();
+  }, [redrawAll]);
+
+  const redo = useCallback(() => {
+    if (redoStack.current.length === 0) return;
+    const last = redoStack.current.pop();
+    if (last) paths.current.push(last);
+    redrawAll();
+  }, [redrawAll]);
+
+  const clearCanvas = useCallback(() => {
+    paths.current = [];
+    redoStack.current = [];
+    redrawAll();
+  }, [redrawAll]);
 
   const captureCanvas = useCallback(() => {
     if (drawingCanvasRef.current) {
@@ -38,13 +86,21 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
   useEffect(() => {
     const handleClear = () => clearCanvas();
     const handleCapture = () => captureCanvas();
+    const handleUndo = () => undo();
+    const handleRedo = () => redo();
+
     window.addEventListener('clear-canvas', handleClear);
     window.addEventListener('request-capture', handleCapture);
+    window.addEventListener('undo-canvas', handleUndo);
+    window.addEventListener('redo-canvas', handleRedo);
+
     return () => {
       window.removeEventListener('clear-canvas', handleClear);
       window.removeEventListener('request-capture', handleCapture);
+      window.removeEventListener('undo-canvas', handleUndo);
+      window.removeEventListener('redo-canvas', handleRedo);
     };
-  }, [clearCanvas, captureCanvas]);
+  }, [clearCanvas, captureCanvas, undo, redo]);
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current || !drawingCanvasRef.current || !cursorCanvasRef.current) return;
@@ -56,7 +112,6 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
     if (!canvasCtx || !drawingCtx || !cursorCtx) return;
 
     const onResults = (results: any) => {
-      // Clear skeleton canvas and cursor canvas
       canvasCtx.save();
       canvasCtx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
       cursorCtx.clearRect(0, 0, cursorCanvasRef.current!.width, cursorCanvasRef.current!.height);
@@ -65,8 +120,6 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const landmarks = results.multiHandLandmarks[0];
-        
-        // Landmark positions (normalized 0 to 1)
         const indexTip = landmarks[8];
         const indexPip = landmarks[6];
         const middleTip = landmarks[12];
@@ -76,62 +129,55 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
         const pinkyTip = landmarks[20];
         const pinkyPip = landmarks[18];
 
-        // Finger States
         const isIndexUp = indexTip.y < indexPip.y;
         const isMiddleUp = middleTip.y < middlePip.y;
         const isRingUp = ringTip.y < ringPip.y;
         const isPinkyUp = pinkyTip.y < pinkyPip.y;
 
-        // Map normalized coordinates to canvas size
         const x = (1 - indexTip.x) * drawingCanvasRef.current!.width;
         const y = indexTip.y * drawingCanvasRef.current!.height;
 
-        // Gesture Recognition Logic
         if (isIndexUp && isMiddleUp && isRingUp && isPinkyUp) {
           detectedGesture = GestureType.HOVER;
-          isDrawing.current = false;
-          lastPoint.current = null;
         } else if (isIndexUp && isMiddleUp) {
           detectedGesture = GestureType.HOVER;
-          isDrawing.current = false;
-          lastPoint.current = null;
         } else if (isIndexUp && !isMiddleUp) {
           detectedGesture = GestureType.DRAW;
-          isDrawing.current = true;
         } else if (!isIndexUp && !isMiddleUp && !isRingUp && !isPinkyUp) {
           detectedGesture = GestureType.ERASE;
-          isDrawing.current = false;
-          lastPoint.current = null;
+        }
+
+        // Gesture management
+        if (detectedGesture === GestureType.DRAW || detectedGesture === GestureType.ERASE) {
+          const type = detectedGesture === GestureType.ERASE ? PathType.ERASE : PathType.DRAW;
           
-          // Erase logic: clear a circle around the hand tip
-          drawingCtx.globalCompositeOperation = 'destination-out';
-          drawingCtx.beginPath();
-          drawingCtx.arc(x, y, 40, 0, Math.PI * 2);
-          drawingCtx.fill();
-          drawingCtx.globalCompositeOperation = 'source-over';
-        } else {
-          detectedGesture = GestureType.NONE;
-          isDrawing.current = false;
-          lastPoint.current = null;
-        }
+          if (!currentPath.current || currentPath.current.type !== type) {
+            // Commit old path if switching types mid-gesture
+            if (currentPath.current) {
+              paths.current.push(currentPath.current);
+            }
+            currentPath.current = {
+              points: [{ x, y }],
+              color: config.color,
+              size: type === PathType.ERASE ? 40 : config.brushSize,
+              type: type
+            };
+            redoStack.current = [];
+          } else {
+            currentPath.current.points.push({ x, y });
+          }
 
-        // Draw the cursor
-        cursorCtx.beginPath();
-        cursorCtx.arc(x, y, detectedGesture === GestureType.DRAW ? config.brushSize / 2 : 12, 0, Math.PI * 2);
-        cursorCtx.strokeStyle = config.color;
-        cursorCtx.lineWidth = 2;
-        cursorCtx.stroke();
-        if (detectedGesture === GestureType.DRAW) {
-           cursorCtx.fillStyle = config.color;
-           cursorCtx.fill();
-        }
-
-        // Drawing Logic
-        if (isDrawing.current) {
+          // Immediate drawing for responsiveness
           drawingCtx.lineCap = 'round';
           drawingCtx.lineJoin = 'round';
-          drawingCtx.strokeStyle = config.color;
-          drawingCtx.lineWidth = config.brushSize;
+          drawingCtx.lineWidth = currentPath.current.size;
+
+          if (type === PathType.ERASE) {
+            drawingCtx.globalCompositeOperation = 'destination-out';
+          } else {
+            drawingCtx.globalCompositeOperation = 'source-over';
+            drawingCtx.strokeStyle = config.color;
+          }
 
           if (lastPoint.current) {
             drawingCtx.beginPath();
@@ -140,13 +186,34 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
             drawingCtx.stroke();
           }
           lastPoint.current = { x, y };
+        } else {
+          // Gesture stopped
+          if (currentPath.current) {
+            paths.current.push(currentPath.current);
+            currentPath.current = null;
+          }
+          lastPoint.current = null;
+        }
+
+        // Draw the cursor
+        cursorCtx.beginPath();
+        cursorCtx.arc(x, y, detectedGesture === GestureType.DRAW ? config.brushSize / 2 : (detectedGesture === GestureType.ERASE ? 20 : 12), 0, Math.PI * 2);
+        cursorCtx.strokeStyle = detectedGesture === GestureType.ERASE ? '#ef4444' : config.color;
+        cursorCtx.lineWidth = 2;
+        cursorCtx.stroke();
+        if (detectedGesture === GestureType.DRAW) {
+           cursorCtx.fillStyle = config.color;
+           cursorCtx.fill();
         }
 
         onGestureChange(detectedGesture);
       } else {
-        onGestureChange(GestureType.NONE);
-        isDrawing.current = false;
+        if (currentPath.current) {
+          paths.current.push(currentPath.current);
+          currentPath.current = null;
+        }
         lastPoint.current = null;
+        onGestureChange(GestureType.NONE);
       }
       canvasCtx.restore();
     };
@@ -174,14 +241,17 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
 
     camera.start();
 
-    // Set canvas sizes
     const resize = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
       [canvasRef, drawingCanvasRef, cursorCanvasRef].forEach(ref => {
         if (ref.current) {
+          const temp = ref.current.getContext('2d')?.getImageData(0,0, ref.current.width, ref.current.height);
           ref.current.width = w;
           ref.current.height = h;
+          if (temp && ref === drawingCanvasRef) {
+            redrawAll(); // Redraw on resize
+          }
         }
       });
     };
@@ -192,14 +262,11 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
       camera.stop();
       window.removeEventListener('resize', resize);
     };
-  }, [config.color, config.brushSize, onGestureChange]);
+  }, [config.color, config.brushSize, onGestureChange, redrawAll]);
 
   return (
     <div className="relative w-full h-full bg-black">
-      {/* Hidden video element for MediaPipe input */}
       <video ref={videoRef} className="hidden" playsInline muted />
-      
-      {/* Camera Preview - 50% opacity, mirrored */}
       <div className="absolute inset-0 z-0">
         <video 
           autoPlay 
@@ -209,24 +276,9 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
           ref={(el) => { if (el) el.srcObject = videoRef.current?.srcObject || null; }}
         />
       </div>
-
-      {/* Main Drawing Layer */}
-      <canvas 
-        ref={drawingCanvasRef} 
-        className="absolute inset-0 z-10 w-full h-full pointer-events-none" 
-      />
-
-      {/* MediaPipe Debug / Skeleton Layer */}
-      <canvas 
-        ref={canvasRef} 
-        className="absolute inset-0 z-20 w-full h-full pointer-events-none" 
-      />
-
-      {/* Visual Cursor Layer */}
-      <canvas 
-        ref={cursorCanvasRef} 
-        className="absolute inset-0 z-30 w-full h-full pointer-events-none" 
-      />
+      <canvas ref={drawingCanvasRef} className="absolute inset-0 z-10 w-full h-full pointer-events-none" />
+      <canvas ref={canvasRef} className="absolute inset-0 z-20 w-full h-full pointer-events-none" />
+      <canvas ref={cursorCanvasRef} className="absolute inset-0 z-30 w-full h-full pointer-events-none" />
     </div>
   );
 };
