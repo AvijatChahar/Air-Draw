@@ -1,0 +1,7 @@
+{
+  "name": "AirDraw AI",
+  "description": "A high-performance hand-tracking drawing application. Use your index finger to paint, two fingers to hover, and a fist to erase.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
