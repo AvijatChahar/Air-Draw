@@ -5,7 +5,7 @@ import { GestureType, DrawingConfig, Point, Path, PathType } from '../types';
 interface AirCanvasProps {
   config: DrawingConfig;
   onGestureChange: (gesture: GestureType) => void;
-  onCapture: (dataUrl: string) => void;
+  onCapture?: (dataUrl: string) => void;
 }
 
 // Global MediaPipe references
@@ -78,29 +78,62 @@ export const AirCanvas: React.FC<AirCanvasProps> = ({ config, onGestureChange, o
   }, [redrawAll]);
 
   const captureCanvas = useCallback(() => {
-    if (drawingCanvasRef.current) {
+    if (drawingCanvasRef.current && onCapture) {
       onCapture(drawingCanvasRef.current.toDataURL('image/png'));
     }
   }, [onCapture]);
 
+  const downloadCanvas = useCallback(() => {
+    if (drawingCanvasRef.current) {
+      const link = document.createElement('a');
+      link.download = `airdraw-${Date.now()}.png`;
+      link.href = drawingCanvasRef.current.toDataURL('image/png');
+      link.click();
+    }
+  }, []);
+
   useEffect(() => {
     const handleClear = () => clearCanvas();
     const handleCapture = () => captureCanvas();
+    const handleDownload = () => downloadCanvas();
     const handleUndo = () => undo();
     const handleRedo = () => redo();
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is in an input field
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      } else if (e.key.toLowerCase() === 'c' || e.key === 'Delete') {
+        clearCanvas();
+      }
+    };
+
     window.addEventListener('clear-canvas', handleClear);
     window.addEventListener('request-capture', handleCapture);
+    window.addEventListener('download-canvas', handleDownload);
     window.addEventListener('undo-canvas', handleUndo);
     window.addEventListener('redo-canvas', handleRedo);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('clear-canvas', handleClear);
       window.removeEventListener('request-capture', handleCapture);
+      window.removeEventListener('download-canvas', handleDownload);
       window.removeEventListener('undo-canvas', handleUndo);
       window.removeEventListener('redo-canvas', handleRedo);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [clearCanvas, captureCanvas, undo, redo]);
+  }, [clearCanvas, captureCanvas, downloadCanvas, undo, redo]);
 
   useEffect(() => {
     if (!videoRef.current || !canvasRef.current || !drawingCanvasRef.current || !cursorCanvasRef.current) return;
