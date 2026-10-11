@@ -38,7 +38,6 @@ AirDraw AI follows a **Client-Side Component-Driven Architecture** with dedicate
 
 
 ```mermaid
-
 graph TB
     subgraph Client ["Client Browser Runtime (Vite + React 19)"]
         subgraph Hardware ["Input Devices"]
@@ -69,29 +68,33 @@ graph TB
     end
 
     subgraph Cloud ["Google Cloud / Gemini API"]
-        GeminiAPI["Gemini 3 Flash Vision Endpoint"]
+        GeminiAPI["Gemini 2.5 Flash Vision Endpoint"]
     end
 
-    Camera -->|Video Frames (1280x720)| MPCamera
-    MPCamera -->|Frame Callback| MPHands
-    MPHands -->|multiHandLandmarks| LandmarkDetector
-    LandmarkDetector -->|Tip / Pip Coordinates| GestureClassifier
-    GestureClassifier -->|GestureType (DRAW / HOVER / ERASE)| CanvasEngine
-    GestureClassifier -->|Active Gesture Event| AppRoot
+    %% Connections with fixed syntax and quoted labels
+    Camera -->|"Video Frames (1280x720)"| MPCamera
+    MPCamera -->|"Frame Callback"| MPHands
+    MPHands -->|"multiHandLandmarks"| LandmarkDetector
+    LandmarkDetector -->|"Tip / Pip Coordinates"| GestureClassifier
+    GestureClassifier -->|"GestureType (DRAW / HOVER / ERASE)"| CanvasEngine
+    GestureClassifier -->|"Active Gesture Event"| AppRoot
     AppRoot --> HUD
 
-    CanvasEngine -->|Vector Points| PathStore
-    Controls -->|Trigger Events| EventBus
-    EventBus -->|Command Dispatch| CanvasEngine
+    CanvasEngine -->|"Vector Points"| PathStore
+    Controls -->|"Trigger Events"| EventBus
+    EventBus -->|"Command Dispatch"| CanvasEngine
 
-    Controls -->|Analyze Request| AppRoot
-    DrawCanvas -->|toDataURL('image/png')| AppRoot
-    AppRoot -->|Base64 Image Payload| GeminiAPI
-    GeminiAPI -->|AI Feedback Text| AppRoot
-    AppRoot -->|Render AI Card| HUD
+    Controls -->|"Analyze Request"| AppRoot
+    DrawCanvas -->|"toDataURL('image/png')"| AppRoot
+    AppRoot -->|"Base64 Image Payload"| GeminiAPI
+    GeminiAPI -->|"AI Feedback Text"| AppRoot
+    AppRoot -->|"Render AI Card"| HUD
+
 ```
 
+
 ---
+
 
 ## 3. Technology Stack & Architectural Roles
 
