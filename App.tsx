@@ -3,13 +3,13 @@ import { AirCanvas } from './components/AirCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { GestureLegend } from './components/GestureLegend';
 import { GestureType, DrawingConfig } from './types';
-
+import { Analytics } from "@vercel/analytics/next"
 const App: React.FC = () => {
   const [config, setConfig] = useState<DrawingConfig>({
     color: '#3b82f6',
     brushSize: 8,
   });
-  
+
   const [currentGesture, setCurrentGesture] = useState<GestureType>(GestureType.NONE);
 
   const handleGestureChange = useCallback((gesture: GestureType) => {
@@ -19,8 +19,8 @@ const App: React.FC = () => {
   return (
     <div className="relative w-screen h-screen bg-zinc-950 overflow-hidden font-sans">
       {/* Background Canvas & Camera */}
-      <AirCanvas 
-        config={config} 
+      <AirCanvas
+        config={config}
         onGestureChange={handleGestureChange}
       />
 
@@ -33,14 +33,14 @@ const App: React.FC = () => {
             </h1>
             <p className="text-zinc-500 text-[10px] font-medium tracking-tight opacity-40">Hand Gesture Canvas</p>
           </div>
-          
+
           <GestureLegend currentGesture={currentGesture} />
         </div>
 
         <div className="flex justify-center w-full pointer-events-auto">
-          <ControlPanel 
-            config={config} 
-            setConfig={setConfig} 
+          <ControlPanel
+            config={config}
+            setConfig={setConfig}
             onClear={() => window.dispatchEvent(new CustomEvent('clear-canvas'))}
             onDownload={() => window.dispatchEvent(new CustomEvent('download-canvas'))}
           />
@@ -49,5 +49,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
+<Analytics />
 export default App;
