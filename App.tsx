@@ -3,7 +3,7 @@ import { AirCanvas } from './components/AirCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { GestureLegend } from './components/GestureLegend';
 import { GestureType, DrawingConfig } from './types';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from '@vercel/analytics/react';
 const App: React.FC = () => {
   const [config, setConfig] = useState<DrawingConfig>({
     color: '#3b82f6',
@@ -46,8 +46,9 @@ const App: React.FC = () => {
           />
         </div>
       </div>
+      <Analytics />
     </div>
   );
 };
-<Analytics />
+
 export default App;
